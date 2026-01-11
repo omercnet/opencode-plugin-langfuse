@@ -1,6 +1,6 @@
 {
   "name": "opencode-plugin-langfuse",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Langfuse observability plugin for OpenCode - LLM tracing, prompt versioning, and cost tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
