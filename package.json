@@ -31,6 +31,9 @@
     "type": "git",
     "url": "https://github.com/omercnet/opencode-plugin-langfuse"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@opencode-ai/plugin": "*"
   },
