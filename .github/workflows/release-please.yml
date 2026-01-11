@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pull-requests: write
 
 name: release-please
@@ -19,7 +20,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: ${{ steps.release.outputs.release_created }}
 
       - uses: oven-sh/setup-bun@v2
