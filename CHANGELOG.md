@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.3...opencode-plugin-langfuse-v0.1.4) (2026-01-11)
+
+
+### Bug Fixes
+
+* make release work ([0ee2d46](https://github.com/omercnet/opencode-plugin-langfuse/commit/0ee2d46e537b4d4b525b3778b64b14ec741abdf0))
+
 ## [0.1.3](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.2...opencode-plugin-langfuse-v0.1.3) (2026-01-11)
 
 
