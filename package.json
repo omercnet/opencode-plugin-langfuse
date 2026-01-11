@@ -1,0 +1,59 @@
+{
+  "name": "opencode-plugin-langfuse",
+  "version": "0.1.0",
+  "description": "Langfuse observability plugin for OpenCode - LLM tracing, prompt versioning, and cost tracking",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "bun test",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "opencode",
+    "langfuse",
+    "observability",
+    "llm",
+    "tracing",
+    "ai"
+  ],
+  "author": "omercnet",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omercnet/opencode-plugin-langfuse"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "dependencies": {
+    "langfuse": "^3.38.6"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
+    "@types/bun": "^1.3.5",
+    "@types/node": "^22.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.19.1",
+    "@typescript-eslint/parser": "^8.19.1",
+    "eslint": "^9.18.0",
+    "globals": "^17.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

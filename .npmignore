@@ -1,0 +1,9 @@
+src/
+*.ts
+!*.d.ts
+tsconfig.json
+.prettierrc
+eslint.config.js
+node_modules/
+.env
+.env.local
