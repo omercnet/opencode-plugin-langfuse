@@ -1,3 +1,6 @@
 [env]
 LANGFUSE_DEBUG = "true"
-LANGFUSE_PUBLIC_KEY = "pk-lf-f8cdd6b1-1691-4bba-9310-24b0f0153927"
+
+[tools]
+bun = "latest"
+opencode = "latest"

@@ -1,9 +1,0 @@
-default_provider = "keychain"
-
-[providers.keychain]
-type = "keychain"
-service = "fnox"
-prefix = "langfuse"
-
-[secrets]
-LANGFUSE_SECRET_KEY = { provider = "keychain", value = "LANGFUSE_SECRET_KEY" }

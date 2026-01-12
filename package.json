@@ -34,12 +34,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "peerDependencies": {
-    "@opencode-ai/plugin": "^1.1.13"
-  },
   "dependencies": {
-    "@langfuse/otel": "^4.5.1",
-    "@opentelemetry/sdk-node": "^0.209.0"
+    "@langfuse/otel": "4.5.1",
+    "@opencode-ai/plugin": "^1.1.14",
+    "@opentelemetry/sdk-node": "0.203.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.3.1",
