@@ -30,7 +30,7 @@ export default [
         { argsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
-      "no-console": ["warn", { allow: ["warn", "error", "log"] }],
+      "no-console": "error",
       "no-unused-vars": "off",
     },
   },

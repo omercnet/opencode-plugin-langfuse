@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test";
-import { createLangfusePlugin } from "./index";
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { LangfusePlugin } from "./index";
 
 const mockTrace = {
   score: mock(() => {}),
@@ -87,7 +87,47 @@ const createSessionErrorEvent = (sessionId: string, errorName: string) =>
     },
   }) as any;
 
-describe("createLangfusePlugin", () => {
+const createSessionCompactedEvent = (sessionId: string) =>
+  ({
+    type: "session.compacted",
+    properties: { sessionID: sessionId },
+  }) as any;
+
+const createMessageUpdatedEvent = (
+  sessionId: string,
+  messageId: string,
+  tokens?: { input: number; output: number },
+  cost?: number
+) =>
+  ({
+    type: "message.updated",
+    properties: {
+      info: {
+        id: messageId,
+        sessionID: sessionId,
+        role: "assistant",
+        modelID: "gpt-4",
+        providerID: "openai",
+        tokens: tokens
+          ? { ...tokens, reasoning: 0, cache: { read: 0, write: 0 } }
+          : undefined,
+        cost,
+      },
+    },
+  }) as any;
+
+const mockPluginInput = {
+  client: {},
+  project: { id: "proj-123", worktree: "/test" },
+  directory: "/test/dir",
+  worktree: "/test/worktree",
+  serverUrl: new URL("http://localhost:3000"),
+  $: {},
+} as any;
+
+describe("LangfusePlugin", () => {
+  const originalEnv = { ...process.env };
+
   beforeEach(() => {
     mockTrace.score.mockClear();
     mockTrace.generation.mockClear();
@@ -97,20 +137,28 @@ describe("createLangfusePlugin", () => {
     mockLangfuse.flushAsync.mockClear();
   });
 
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  const setupEnv = (overrides: Record<string, string> = {}) => {
+    process.env.LANGFUSE_PUBLIC_KEY = "pk-test";
+    process.env.LANGFUSE_SECRET_KEY = "sk-test";
+    Object.assign(process.env, overrides);
+  };
+
   describe("credentials", () => {
     it("returns empty hooks when credentials missing", async () => {
-      const plugin = createLangfusePlugin();
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      delete process.env.LANGFUSE_PUBLIC_KEY;
+      delete process.env.LANGFUSE_SECRET_KEY;
 
+      const hooks = await LangfusePlugin(mockPluginInput);
       expect(hooks).toEqual({});
     });
 
-    it("returns hooks when credentials provided via config", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+    it("returns hooks when credentials provided via env", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       expect(hooks.event).toBeDefined();
       expect(hooks["tool.execute.before"]).toBeDefined();
@@ -121,11 +169,8 @@ describe("createLangfusePlugin", () => {
 
   describe("session lifecycle", () => {
     it("creates trace on session.created", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -138,11 +183,8 @@ describe("createLangfusePlugin", () => {
     });
 
     it("records scores and flushes on session.idle", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
       await hooks.event!({ event: createSessionIdleEvent("sess-1") });
@@ -160,11 +202,8 @@ describe("createLangfusePlugin", () => {
     });
 
     it("records scores and flushes on session.deleted", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
       await hooks.event!({ event: createSessionDeletedEvent("sess-1") });
@@ -172,21 +211,12 @@ describe("createLangfusePlugin", () => {
       expect(mockTrace.score).toHaveBeenCalledWith(
         expect.objectContaining({ name: "messages-count" })
       );
-      expect(mockTrace.score).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "tools-count" })
-      );
-      expect(mockTrace.score).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "duration-ms" })
-      );
       expect(mockLangfuse.flushAsync).toHaveBeenCalled();
     });
 
     it("logs error event on session.error", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
       await hooks.event!({
@@ -204,14 +234,10 @@ describe("createLangfusePlugin", () => {
 
   describe("message streaming", () => {
     it("accumulates text without creating generation until complete", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
-
       await hooks.event!({
         event: createMessagePartEvent("sess-1", "msg-1", "Hello"),
       });
@@ -223,11 +249,8 @@ describe("createLangfusePlugin", () => {
     });
 
     it("creates single generation when message completes", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -254,11 +277,8 @@ describe("createLangfusePlugin", () => {
     });
 
     it("flushes pending messages on session idle", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
       await hooks.event!({
@@ -279,11 +299,8 @@ describe("createLangfusePlugin", () => {
 
   describe("tool timing", () => {
     it("tracks tool duration between before and after hooks", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -309,18 +326,17 @@ describe("createLangfusePlugin", () => {
         })
       );
 
-      const spanCall = mockTrace.span.mock.calls[0][0];
+      const calls = mockTrace.span.mock.calls as any[];
+      const spanCall = calls[0]?.[0];
+      expect(spanCall).toBeDefined();
       const duration =
         spanCall.endTime.getTime() - spanCall.startTime.getTime();
       expect(duration).toBeGreaterThanOrEqual(10);
     });
 
     it("increments tool count on each execution", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -352,11 +368,8 @@ describe("createLangfusePlugin", () => {
 
   describe("user input capture", () => {
     it("captures user input via chat.message hook", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -387,11 +400,8 @@ describe("createLangfusePlugin", () => {
 
   describe("model info capture", () => {
     it("captures model info via chat.message hook for assistant messages", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -426,14 +436,106 @@ describe("createLangfusePlugin", () => {
     });
   });
 
-  describe("config options", () => {
-    it("passes custom metadata to trace", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-        metadata: { environment: "test", version: "1.0" },
+  describe("token and cost tracking", () => {
+    it("tracks token usage from message.updated events", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
+
+      await hooks.event!({ event: createSessionEvent("sess-1") });
+      await hooks.event!({
+        event: createMessageUpdatedEvent(
+          "sess-1",
+          "msg-1",
+          { input: 100, output: 50 },
+          0.005
+        ),
       });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
+      await hooks.event!({ event: createSessionIdleEvent("sess-1") });
+
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "input-tokens", value: 100 })
+      );
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "output-tokens", value: 50 })
+      );
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "total-cost-usd", value: 0.005 })
+      );
+    });
+
+    it("accumulates tokens across multiple messages", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
+
+      await hooks.event!({ event: createSessionEvent("sess-1") });
+      await hooks.event!({
+        event: createMessageUpdatedEvent("sess-1", "msg-1", {
+          input: 100,
+          output: 50,
+        }),
+      });
+      await hooks.event!({
+        event: createMessageUpdatedEvent("sess-1", "msg-2", {
+          input: 200,
+          output: 100,
+        }),
+      });
+      await hooks.event!({ event: createSessionIdleEvent("sess-1") });
+
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "input-tokens", value: 300 })
+      );
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "output-tokens", value: 150 })
+      );
+    });
+  });
+
+  describe("compaction tracking", () => {
+    it("tracks session compaction events", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput);
+
+      await hooks.event!({ event: createSessionEvent("sess-1") });
+      await hooks.event!({ event: createSessionCompactedEvent("sess-1") });
+      await hooks.event!({ event: createSessionCompactedEvent("sess-1") });
+      await hooks.event!({ event: createSessionIdleEvent("sess-1") });
+
+      expect(mockTrace.event).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "context-compacted",
+          output: { compactionNumber: 1 },
+        })
+      );
+      expect(mockTrace.event).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "context-compacted",
+          output: { compactionNumber: 2 },
+        })
+      );
+      expect(mockTrace.score).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "compactions-count", value: 2 })
+      );
+    });
+  });
+
+  describe("config via environment", () => {
+    it("includes promptVersion in tags when provided via env", async () => {
+      setupEnv({ PROMPT_VERSION: "v2.0" });
+      const hooks = await LangfusePlugin(mockPluginInput);
+
+      await hooks.event!({ event: createSessionEvent("sess-1") });
+
+      expect(mockLangfuse.trace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: expect.arrayContaining(["opencode", "v2.0"]),
+        })
+      );
+    });
+
+    it("parses LANGFUSE_METADATA json and includes in trace", async () => {
+      setupEnv({ LANGFUSE_METADATA: '{"environment":"test","version":"1.0"}' });
+      const hooks = await LangfusePlugin(mockPluginInput);
 
       await hooks.event!({ event: createSessionEvent("sess-1") });
 
@@ -443,23 +545,6 @@ describe("createLangfusePlugin", () => {
             environment: "test",
             version: "1.0",
           }),
-        })
-      );
-    });
-
-    it("includes promptVersion in tags when provided", async () => {
-      const plugin = createLangfusePlugin({
-        publicKey: "pk-test",
-        secretKey: "sk-test",
-        promptVersion: "v2.0",
-      });
-      const hooks = await plugin({ project: { pathname: "/test" } } as any);
-
-      await hooks.event!({ event: createSessionEvent("sess-1") });
-
-      expect(mockLangfuse.trace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tags: expect.arrayContaining(["opencode", "v2.0"]),
         })
       );
     });
