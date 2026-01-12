@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.6...opencode-plugin-langfuse-v0.1.7) (2026-01-12)
+
+
+### Bug Fixes
+
+* missing opentelemetry/sdk-trace-base peerdep ([6dfebbc](https://github.com/omercnet/opencode-plugin-langfuse/commit/6dfebbc81a90e5b525ce7aa6439373e0bd629d41))
+
 ## [0.1.6](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.5...opencode-plugin-langfuse-v0.1.6) (2026-01-12)
 
 
