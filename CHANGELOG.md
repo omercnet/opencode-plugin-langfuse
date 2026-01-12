@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.4...opencode-plugin-langfuse-v0.1.5) (2026-01-12)
+
+
+### Bug Fixes
+
+* flush :faceplam: ([d3ae1d5](https://github.com/omercnet/opencode-plugin-langfuse/commit/d3ae1d5be46891346717ed3a992c658b1e0070e5))
+* foramt ([43b4bc7](https://github.com/omercnet/opencode-plugin-langfuse/commit/43b4bc726e6fa11bea7226db9fc72790bf8a3485))
+
 ## [0.1.4](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.3...opencode-plugin-langfuse-v0.1.4) (2026-01-11)
 
 
