@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@langfuse/otel": "4.5.1",
-    "@opencode-ai/plugin": "^1.1.14",
+    "@opencode-ai/plugin": "1.1.14",
     "@opentelemetry/sdk-node": "0.203.0"
   },
   "devDependencies": {
