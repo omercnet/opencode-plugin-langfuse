@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.7...opencode-plugin-langfuse-v0.1.8) (2026-01-21)
+
+
+### Bug Fixes
+
+* shudown sdk when instance is disposed ([da3b985](https://github.com/omercnet/opencode-plugin-langfuse/commit/da3b9851472e22b3994915d487018b7e5e3aec18))
+
 ## [0.1.7](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.6...opencode-plugin-langfuse-v0.1.7) (2026-01-12)
 
 
