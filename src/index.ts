@@ -48,8 +48,10 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     event: async ({ event }) => {
       if (event.type === "session.idle") {
         log("info", "Flushing OTEL spans before idle");
-        await processor.forceFlush();
+        await processor.forceFlush(); // Flushes the trace to Langfuse
       }
+
+      if (event.type === "server.instance.disposed") await sdk.shutdown(); // Flushes the trace to Langfuse
     },
   };
 };
