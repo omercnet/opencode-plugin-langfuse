@@ -3,16 +3,28 @@ import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
+const mockShutdown = mock(() => Promise.resolve());
 
-mock.module("@langfuse/otel", () => ({
-  LangfuseSpanProcessor: mock(() => ({
-    forceFlush: mockForceFlush,
-  })),
-}));
+// Track if setAttribute was called
+let capturedSpan: { setAttribute?: (key: string, value: any) => void } = {};
+
+mock.module("@langfuse/otel", () => {
+  return {
+    LangfuseSpanProcessor: mock((config: any) => ({
+      forceFlush: mockForceFlush,
+      onStart: (span: any, context: any) => {
+        capturedSpan = span;
+      },
+      onEnd: mock(() => {}),
+      shutdown: mockShutdown,
+    })),
+  };
+});
 
 mock.module("@opentelemetry/sdk-node", () => ({
   NodeSDK: mock(() => ({
     start: mockStart,
+    shutdown: mockShutdown,
   })),
 }));
 
@@ -40,7 +52,9 @@ describe("LangfusePlugin", () => {
   beforeEach(() => {
     mockForceFlush.mockClear();
     mockStart.mockClear();
+    mockShutdown.mockClear();
     mockLog.mockClear();
+    capturedSpan = {};
   });
 
   afterEach(() => {
@@ -57,6 +71,9 @@ describe("LangfusePlugin", () => {
     it("returns empty hooks when credentials missing", async () => {
       delete process.env.LANGFUSE_PUBLIC_KEY;
       delete process.env.LANGFUSE_SECRET_KEY;
+      delete process.env.LANGFUSE_BASEURL;
+      delete process.env.LANGFUSE_ENVIRONMENT;
+      delete process.env.LANGFUSE_USER_ID;
 
       const hooks = await LangfusePlugin(mockPluginInput());
 
@@ -193,6 +210,51 @@ describe("LangfusePlugin", () => {
           service: "langfuse-otel",
           level: "info",
           message: "OTEL tracing initialized → https://custom.langfuse.com",
+        },
+      });
+    });
+  });
+
+  describe("user tracking", () => {
+    it("creates plugin with userId when provided", async () => {
+      setupEnv({ LANGFUSE_USER_ID: "user-123" });
+
+      const hooks = await LangfusePlugin(mockPluginInput());
+
+      // Verify plugin still initializes properly
+      expect(hooks.config).toBeDefined();
+      expect(hooks.event).toBeDefined();
+      expect(mockStart).toHaveBeenCalled();
+    });
+
+    it("creates plugin without userId when not provided", async () => {
+      setupEnv();
+      delete process.env.LANGFUSE_USER_ID;
+
+      const hooks = await LangfusePlugin(mockPluginInput());
+
+      // Verify plugin still initializes properly
+      expect(hooks.config).toBeDefined();
+      expect(hooks.event).toBeDefined();
+      expect(mockStart).toHaveBeenCalled();
+    });
+
+    it("works with all environment variables together", async () => {
+      setupEnv({
+        LANGFUSE_BASEURL: "https://custom.example.com",
+        LANGFUSE_ENVIRONMENT: "production",
+        LANGFUSE_USER_ID: "user@example.com",
+      });
+
+      const hooks = await LangfusePlugin(mockPluginInput());
+
+      expect(hooks.config).toBeDefined();
+      expect(mockStart).toHaveBeenCalled();
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "info",
+          message: "OTEL tracing initialized → https://custom.example.com",
         },
       });
     });
