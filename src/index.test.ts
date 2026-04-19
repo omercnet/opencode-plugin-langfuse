@@ -3,6 +3,9 @@ import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
+const mockShutdown = mock(() => Promise.resolve());
+
+let capturedNodeSDKOptions: Record<string, unknown> = {};
 
 mock.module("@langfuse/otel", () => ({
   LangfuseSpanProcessor: mock(() => ({
@@ -11,9 +14,13 @@ mock.module("@langfuse/otel", () => ({
 }));
 
 mock.module("@opentelemetry/sdk-node", () => ({
-  NodeSDK: mock(() => ({
-    start: mockStart,
-  })),
+  NodeSDK: mock((options: Record<string, unknown>) => {
+    capturedNodeSDKOptions = options;
+    return {
+      start: mockStart,
+      shutdown: mockShutdown,
+    };
+  }),
 }));
 
 const mockLog = mock(() => {});
@@ -40,7 +47,9 @@ describe("LangfusePlugin", () => {
   beforeEach(() => {
     mockForceFlush.mockClear();
     mockStart.mockClear();
+    mockShutdown.mockClear();
     mockLog.mockClear();
+    capturedNodeSDKOptions = {};
   });
 
   afterEach(() => {
@@ -193,6 +202,47 @@ describe("LangfusePlugin", () => {
           service: "langfuse-otel",
           level: "info",
           message: "OTEL tracing initialized → https://custom.langfuse.com",
+        },
+      });
+    });
+  });
+
+  describe("trace stitching", () => {
+    it("passes idGenerator to NodeSDK", async () => {
+      setupEnv();
+      await LangfusePlugin(mockPluginInput());
+
+      expect(capturedNodeSDKOptions.idGenerator).toBeDefined();
+    });
+
+    it("logs parent trace ID when LANGFUSE_TRACE_ID is set", async () => {
+      setupEnv({
+        LANGFUSE_TRACE_ID: "abcdef1234567890abcdef1234567890",
+      });
+
+      await LangfusePlugin(mockPluginInput());
+
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "info",
+          message:
+            "OTEL tracing initialized → https://cloud.langfuse.com (stitching to parent trace abcdef12…)",
+        },
+      });
+    });
+
+    it("does not log parent trace when LANGFUSE_TRACE_ID is not set", async () => {
+      setupEnv();
+      delete process.env.LANGFUSE_TRACE_ID;
+
+      await LangfusePlugin(mockPluginInput());
+
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "info",
+          message: "OTEL tracing initialized → https://cloud.langfuse.com",
         },
       });
     });
