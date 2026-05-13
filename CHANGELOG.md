@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.8...opencode-plugin-langfuse-v0.1.9) (2026-05-13)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @opentelemetry/sdk-node to ^0.217.0 [security] ([#21](https://github.com/omercnet/opencode-plugin-langfuse/issues/21)) ([c038f6e](https://github.com/omercnet/opencode-plugin-langfuse/commit/c038f6e60c62a1a4bea73a8ca3cf3e5102972441))
+
 ## [0.1.8](https://github.com/omercnet/opencode-plugin-langfuse/compare/opencode-plugin-langfuse-v0.1.7...opencode-plugin-langfuse-v0.1.8) (2026-01-21)
 
 
