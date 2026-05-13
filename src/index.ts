@@ -1,12 +1,14 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import type { Plugin } from "@opencode-ai/plugin";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import { UserIdSpanProcessor } from "./UserIdSpanProcessor";
 
 export const LangfusePlugin: Plugin = async ({ client }) => {
   const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
   const secretKey = process.env.LANGFUSE_SECRET_KEY;
   const baseUrl = process.env.LANGFUSE_BASEURL ?? "https://cloud.langfuse.com";
   const environment = process.env.LANGFUSE_ENVIRONMENT ?? "development";
+  const userId = process.env.LANGFUSE_USER_ID;
 
   const log = (level: "info" | "warn" | "error", message: string) => {
     client.app.log({
@@ -22,12 +24,14 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     return {};
   }
 
-  const processor = new LangfuseSpanProcessor({
+  const baseProcessor = new LangfuseSpanProcessor({
     publicKey,
     secretKey,
     baseUrl,
     environment,
   });
+
+  const processor = new UserIdSpanProcessor(baseProcessor, userId);
 
   const sdk = new NodeSDK({
     spanProcessors: [processor],

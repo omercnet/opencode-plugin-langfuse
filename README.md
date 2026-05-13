@@ -71,6 +71,26 @@ OpenCode (OTEL spans) → LangfuseSpanProcessor → Langfuse Dashboard
 | `LANGFUSE_PUBLIC_KEY` | Yes      | -                            | Langfuse public key    |
 | `LANGFUSE_SECRET_KEY` | Yes      | -                            | Langfuse secret key    |
 | `LANGFUSE_BASEURL`    | No       | `https://cloud.langfuse.com` | Self-hosted instance   |
+| `LANGFUSE_USER_ID`    | No       | -                            | User identifier for tracking user-level metrics |
+
+---
+
+## User Tracking
+
+To enable user-level tracking and metrics in Langfuse, configure a user identifier:
+
+```bash
+# Set a user ID (can be username, email, or any unique identifier)
+export LANGFUSE_USER_ID="user-123"
+```
+
+All traces will be attributed to the specified user, allowing you to:
+
+- View usage metrics per user
+- Track costs and token usage by user
+- Filter traces by user ID in the Langfuse dashboard
+
+See [Langfuse User Tracking docs](https://langfuse.com/docs/observability/features/users) for more details.
 
 ---
 
