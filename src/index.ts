@@ -51,7 +51,20 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
         await processor.forceFlush(); // Flushes the trace to Langfuse
       }
 
-      if (event.type === "server.instance.disposed") await sdk.shutdown(); // Flushes the trace to Langfuse
+      if (event.type === "server.instance.disposed") {
+        // omercnet/opencode-plugin-langfuse: sdk.shutdown() can hang under Bun when OTLP
+        // keep-alive sockets linger (oven-sh/bun#13184). Bounded forceFlush only — see
+        // andrewstackme/dotfiles issue #24 / Defects v2 §5 opencode-plugin-langfuse note.
+        const ms = Number(process.env.OPENCODE_LANGFUSE_DISPOSE_FLUSH_MS ?? "8000");
+        log(
+          "info",
+          `Flushing OTEL on server.instance.disposed (max ${ms}ms, no sdk.shutdown)`
+        );
+        await Promise.race([
+          processor.forceFlush(),
+          new Promise<void>((resolve) => setTimeout(resolve, ms)),
+        ]);
+      }
     },
   };
 };

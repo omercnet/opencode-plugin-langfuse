@@ -1,0 +1,53 @@
+import { LangfuseSpanProcessor } from "@langfuse/otel";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+export const LangfusePlugin = async ({ client }) => {
+    const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
+    const secretKey = process.env.LANGFUSE_SECRET_KEY;
+    const baseUrl = process.env.LANGFUSE_BASEURL ?? "https://cloud.langfuse.com";
+    const environment = process.env.LANGFUSE_ENVIRONMENT ?? "development";
+    const log = (level, message) => {
+        client.app.log({
+            body: { service: "langfuse-otel", level, message },
+        });
+    };
+    if (!publicKey || !secretKey) {
+        log("warn", "Missing LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY - tracing disabled");
+        return {};
+    }
+    const processor = new LangfuseSpanProcessor({
+        publicKey,
+        secretKey,
+        baseUrl,
+        environment,
+    });
+    const sdk = new NodeSDK({
+        spanProcessors: [processor],
+    });
+    sdk.start();
+    log("info", `OTEL tracing initialized → ${baseUrl}`);
+    return {
+        config: async (config) => {
+            if (!config.experimental?.openTelemetry) {
+                log("warn", "OpenTelemetry experimental feature is disabled in Opencode config - tracing disabled");
+            }
+        },
+        event: async ({ event }) => {
+            if (event.type === "session.idle") {
+                log("info", "Flushing OTEL spans before idle");
+                await processor.forceFlush(); // Flushes the trace to Langfuse
+            }
+            if (event.type === "server.instance.disposed") {
+                // omercnet/opencode-plugin-langfuse: sdk.shutdown() can hang under Bun when OTLP
+                // keep-alive sockets linger (oven-sh/bun#13184). Bounded forceFlush only — see
+                // andrewstackme/dotfiles issue #24 / Defects v2 §5 opencode-plugin-langfuse note.
+                const ms = Number(process.env.OPENCODE_LANGFUSE_DISPOSE_FLUSH_MS ?? "8000");
+                log("info", `Flushing OTEL on server.instance.disposed (max ${ms}ms, no sdk.shutdown)`);
+                await Promise.race([
+                    processor.forceFlush(),
+                    new Promise((resolve) => setTimeout(resolve, ms)),
+                ]);
+            }
+        },
+    };
+};
+//# sourceMappingURL=index.js.map
