@@ -1,12 +1,16 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import type { Plugin } from "@opencode-ai/plugin";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import { resolveConfig } from "./config";
+import type { LangfusePluginOptions } from "./config";
 
-export const LangfusePlugin: Plugin = async ({ client }) => {
-  const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
-  const secretKey = process.env.LANGFUSE_SECRET_KEY;
-  const baseUrl = process.env.LANGFUSE_BASEURL ?? "https://cloud.langfuse.com";
-  const environment = process.env.LANGFUSE_ENVIRONMENT ?? "development";
+export type { LangfusePluginOptions } from "./config";
+
+export const LangfusePlugin: Plugin = async (
+  { client },
+  options?: LangfusePluginOptions
+) => {
+  const config = resolveConfig(options);
 
   const log = (level: "info" | "warn" | "error", message: string) => {
     client.app.log({
@@ -14,7 +18,7 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     });
   };
 
-  if (!publicKey || !secretKey) {
+  if (!config.publicKey || !config.secretKey) {
     log(
       "warn",
       "Missing LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY - tracing disabled"
@@ -22,23 +26,18 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     return {};
   }
 
-  const processor = new LangfuseSpanProcessor({
-    publicKey,
-    secretKey,
-    baseUrl,
-    environment,
-  });
+  const processor = new LangfuseSpanProcessor(config);
 
   const sdk = new NodeSDK({
     spanProcessors: [processor],
   });
 
   sdk.start();
-  log("info", `OTEL tracing initialized → ${baseUrl}`);
+  log("info", `OTEL tracing initialized → ${config.baseUrl}`);
 
   return {
-    config: async (config) => {
-      if (!config.experimental?.openTelemetry) {
+    config: async (cfg) => {
+      if (!cfg.experimental?.openTelemetry) {
         log(
           "warn",
           "OpenTelemetry experimental feature is disabled in Opencode config - tracing disabled"
@@ -48,10 +47,17 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     event: async ({ event }) => {
       if (event.type === "session.idle") {
         log("info", "Flushing OTEL spans before idle");
-        await processor.forceFlush(); // Flushes the trace to Langfuse
+        try {
+          await processor.forceFlush();
+        } catch (error) {
+          log(
+            "error",
+            `Failed to flush OTEL spans: ${(error as Error).message}`
+          );
+        }
       }
 
-      if (event.type === "server.instance.disposed") await sdk.shutdown(); // Flushes the trace to Langfuse
+      if (event.type === "server.instance.disposed") await sdk.shutdown();
     },
   };
 };
