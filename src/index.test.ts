@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
+const mockShutdown = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
 
 mock.module("@langfuse/otel", () => ({
@@ -13,6 +14,7 @@ mock.module("@langfuse/otel", () => ({
 mock.module("@opentelemetry/sdk-node", () => ({
   NodeSDK: mock(() => ({
     start: mockStart,
+    shutdown: mockShutdown,
   })),
 }));
 
@@ -39,6 +41,7 @@ describe("LangfusePlugin", () => {
 
   beforeEach(() => {
     mockForceFlush.mockClear();
+    mockShutdown.mockClear();
     mockStart.mockClear();
     mockLog.mockClear();
   });
@@ -83,6 +86,48 @@ describe("LangfusePlugin", () => {
           service: "langfuse-otel",
           level: "info",
           message: "OTEL tracing initialized → https://cloud.langfuse.com",
+        },
+      });
+    });
+
+    it("returns hooks when credentials provided via plugin options", async () => {
+      const hooks = await LangfusePlugin(mockPluginInput(), {
+        env: {
+          LANGFUSE_PUBLIC_KEY: "pk-option",
+          LANGFUSE_SECRET_KEY: "sk-option",
+        },
+      });
+
+      expect(hooks.config).toBeDefined();
+      expect(hooks.event).toBeDefined();
+      expect(mockStart).toHaveBeenCalled();
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "info",
+          message: "OTEL tracing initialized → https://cloud.langfuse.com",
+        },
+      });
+    });
+
+    it("plugin options take precedence over process.env", async () => {
+      setupEnv({ LANGFUSE_BASEURL: "https://from-env.langfuse.com" });
+      const hooks = await LangfusePlugin(mockPluginInput(), {
+        env: {
+          LANGFUSE_PUBLIC_KEY: "pk-option",
+          LANGFUSE_SECRET_KEY: "sk-option",
+          LANGFUSE_BASEURL: "https://from-option.langfuse.com",
+        },
+      });
+
+      expect(hooks.config).toBeDefined();
+      expect(hooks.event).toBeDefined();
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "info",
+          message:
+            "OTEL tracing initialized → https://from-option.langfuse.com",
         },
       });
     });
@@ -164,6 +209,40 @@ describe("LangfusePlugin", () => {
       } as any);
 
       expect(mockForceFlush).not.toHaveBeenCalled();
+    });
+
+    it("catches and logs forceFlush rejection", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput());
+      mockForceFlush.mockRejectedValueOnce(new Error("network error"));
+
+      await expect(
+        hooks.event!({
+          event: { type: "session.idle", properties: { sessionID: "sess-1" } },
+        } as any)
+      ).resolves.toBeUndefined();
+
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "error",
+          message: "Failed to flush OTEL spans: network error",
+        },
+      });
+    });
+
+    it("calls sdk.shutdown on server.instance.disposed", async () => {
+      setupEnv();
+      const hooks = await LangfusePlugin(mockPluginInput());
+
+      await hooks.event!({
+        event: {
+          type: "server.instance.disposed",
+          properties: { instanceID: "inst-1" },
+        },
+      } as any);
+
+      expect(mockShutdown).toHaveBeenCalled();
     });
   });
 
