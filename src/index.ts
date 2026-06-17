@@ -1,6 +1,31 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import type { Plugin } from "@opencode-ai/plugin";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import type {
+  ReadableSpan,
+  Span,
+  SpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
+
+const LANGFUSE_SESSION_ID_MAX_LENGTH = 200;
+
+class LangfuseSessionSpanProcessor implements SpanProcessor {
+  constructor(private readonly sessionId: string) {}
+
+  onStart(span: Span): void {
+    span.setAttribute("session.id", this.sessionId);
+  }
+
+  onEnd(_span: ReadableSpan): void {}
+
+  forceFlush(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 export const LangfusePlugin: Plugin = async ({ client }) => {
   const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
@@ -29,8 +54,23 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     environment,
   });
 
+  const sessionId = process.env.LANGFUSE_SESSION_ID?.trim();
+  const sessionProcessor =
+    sessionId && sessionId.length <= LANGFUSE_SESSION_ID_MAX_LENGTH
+      ? new LangfuseSessionSpanProcessor(sessionId)
+      : undefined;
+
+  if (sessionId && !sessionProcessor) {
+    log(
+      "warn",
+      `LANGFUSE_SESSION_ID is longer than ${LANGFUSE_SESSION_ID_MAX_LENGTH} characters - session grouping disabled`
+    );
+  }
+
   const sdk = new NodeSDK({
-    spanProcessors: [processor],
+    spanProcessors: sessionProcessor
+      ? [sessionProcessor, processor]
+      : [processor],
   });
 
   sdk.start();

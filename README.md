@@ -33,6 +33,7 @@ Go to **Settings → API Keys** and copy your keys.
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."
 export LANGFUSE_SECRET_KEY="sk-lf-..."
 export LANGFUSE_BASEURL="https://cloud.langfuse.com"  # Optional
+export LANGFUSE_SESSION_ID="workflow-run-123"          # Optional
 ```
 
 ### 3. Enable Plugin + OTEL
@@ -51,6 +52,15 @@ In `.opencode/opencode.json`:
 ### 4. Run OpenCode
 
 That's it! All traces appear automatically in your Langfuse dashboard.
+
+To group several OpenCode runs into one Langfuse session, reuse the same
+`LANGFUSE_SESSION_ID` for every process in your workflow:
+
+```bash
+WORKFLOW_ID="workflow-$(date +%s)"
+LANGFUSE_SESSION_ID="$WORKFLOW_ID" opencode
+LANGFUSE_SESSION_ID="$WORKFLOW_ID" opencode
+```
 
 ---
 
@@ -71,6 +81,7 @@ OpenCode (OTEL spans) → LangfuseSpanProcessor → Langfuse Dashboard
 | `LANGFUSE_PUBLIC_KEY` | Yes      | -                            | Langfuse public key    |
 | `LANGFUSE_SECRET_KEY` | Yes      | -                            | Langfuse secret key    |
 | `LANGFUSE_BASEURL`    | No       | `https://cloud.langfuse.com` | Self-hosted instance   |
+| `LANGFUSE_SESSION_ID` | No       | -                            | Group traces by session |
 
 ---
 

@@ -3,6 +3,9 @@ import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
+const mockShutdown = mock(() => Promise.resolve());
+
+let capturedNodeSDKOptions: Record<string, unknown> = {};
 
 mock.module("@langfuse/otel", () => ({
   LangfuseSpanProcessor: mock(() => ({
@@ -11,9 +14,13 @@ mock.module("@langfuse/otel", () => ({
 }));
 
 mock.module("@opentelemetry/sdk-node", () => ({
-  NodeSDK: mock(() => ({
-    start: mockStart,
-  })),
+  NodeSDK: mock((options: Record<string, unknown>) => {
+    capturedNodeSDKOptions = options;
+    return {
+      start: mockStart,
+      shutdown: mockShutdown,
+    };
+  }),
 }));
 
 const mockLog = mock(() => {});
@@ -40,7 +47,9 @@ describe("LangfusePlugin", () => {
   beforeEach(() => {
     mockForceFlush.mockClear();
     mockStart.mockClear();
+    mockShutdown.mockClear();
     mockLog.mockClear();
+    capturedNodeSDKOptions = {};
   });
 
   afterEach(() => {
@@ -193,6 +202,48 @@ describe("LangfusePlugin", () => {
           service: "langfuse-otel",
           level: "info",
           message: "OTEL tracing initialized → https://custom.langfuse.com",
+        },
+      });
+    });
+  });
+
+  describe("workflow session grouping", () => {
+    it("preserves current span processors when LANGFUSE_SESSION_ID is missing", async () => {
+      setupEnv();
+
+      await LangfusePlugin(mockPluginInput());
+
+      expect(capturedNodeSDKOptions.spanProcessors).toHaveLength(1);
+    });
+
+    it("adds session.id to spans when LANGFUSE_SESSION_ID is set", async () => {
+      setupEnv({ LANGFUSE_SESSION_ID: "workflow-123" });
+
+      await LangfusePlugin(mockPluginInput());
+
+      const spanProcessors = capturedNodeSDKOptions.spanProcessors as Array<{
+        onStart?: (span: unknown) => void;
+      }>;
+      const setAttribute = mock(() => {});
+
+      expect(spanProcessors).toHaveLength(2);
+      spanProcessors[0].onStart!({ setAttribute });
+
+      expect(setAttribute).toHaveBeenCalledWith("session.id", "workflow-123");
+    });
+
+    it("ignores overlong LANGFUSE_SESSION_ID values", async () => {
+      setupEnv({ LANGFUSE_SESSION_ID: "x".repeat(201) });
+
+      await LangfusePlugin(mockPluginInput());
+
+      expect(capturedNodeSDKOptions.spanProcessors).toHaveLength(1);
+      expect(mockLog).toHaveBeenCalledWith({
+        body: {
+          service: "langfuse-otel",
+          level: "warn",
+          message:
+            "LANGFUSE_SESSION_ID is longer than 200 characters - session grouping disabled",
         },
       });
     });
