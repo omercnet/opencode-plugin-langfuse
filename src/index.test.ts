@@ -3,6 +3,7 @@ import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
+let sdkOptions: any;
 
 mock.module("@langfuse/otel", () => ({
   LangfuseSpanProcessor: mock(() => ({
@@ -11,9 +12,10 @@ mock.module("@langfuse/otel", () => ({
 }));
 
 mock.module("@opentelemetry/sdk-node", () => ({
-  NodeSDK: mock(() => ({
-    start: mockStart,
-  })),
+  NodeSDK: mock((options: any) => {
+    sdkOptions = options;
+    return { start: mockStart };
+  }),
 }));
 
 const mockLog = mock(() => {});
@@ -41,6 +43,7 @@ describe("LangfusePlugin", () => {
     mockForceFlush.mockClear();
     mockStart.mockClear();
     mockLog.mockClear();
+    sdkOptions = undefined;
   });
 
   afterEach(() => {
@@ -50,6 +53,7 @@ describe("LangfusePlugin", () => {
   const setupEnv = (overrides: Record<string, string> = {}) => {
     process.env.LANGFUSE_PUBLIC_KEY = "pk-test";
     process.env.LANGFUSE_SECRET_KEY = "sk-test";
+    delete process.env.LANGFUSE_BASEURL;
     Object.assign(process.env, overrides);
   };
 
@@ -85,6 +89,27 @@ describe("LangfusePlugin", () => {
           message: "OTEL tracing initialized → https://cloud.langfuse.com",
         },
       });
+    });
+
+    it("adds OpenCode context as filterable Langfuse trace metadata", async () => {
+      setupEnv();
+      await LangfusePlugin(mockPluginInput());
+
+      const span = { setAttribute: mock(() => {}) };
+      sdkOptions.spanProcessors[0].onStart(span, {});
+
+      expect(span.setAttribute).toHaveBeenCalledWith(
+        "langfuse.trace.metadata.project",
+        "proj-123"
+      );
+      expect(span.setAttribute).toHaveBeenCalledWith(
+        "langfuse.trace.metadata.directory",
+        "/test/dir"
+      );
+      expect(span.setAttribute).toHaveBeenCalledWith(
+        "langfuse.trace.metadata.worktree",
+        "/test/worktree"
+      );
     });
   });
 

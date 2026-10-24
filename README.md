@@ -58,6 +58,8 @@ That's it! All traces appear automatically in your Langfuse dashboard.
 
 This plugin initializes a `LangfuseSpanProcessor` that captures all OpenTelemetry spans emitted by OpenCode when `experimental.openTelemetry` is enabled.
 
+It also adds the OpenCode project ID, working directory, and worktree to every span as filterable Langfuse trace metadata (`project`, `directory`, and `worktree`).
+
 ```
 OpenCode (OTEL spans) → LangfuseSpanProcessor → Langfuse Dashboard
 ```

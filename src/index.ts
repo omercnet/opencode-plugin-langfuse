@@ -1,8 +1,27 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import type { Plugin } from "@opencode-ai/plugin";
+import type { SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 
-export const LangfusePlugin: Plugin = async ({ client }) => {
+const createMetadataSpanProcessor = (
+  metadata: Record<string, string>
+): SpanProcessor => ({
+  onStart: (span) => {
+    for (const [key, value] of Object.entries(metadata)) {
+      span.setAttribute(`langfuse.trace.metadata.${key}`, value);
+    }
+  },
+  onEnd: () => {},
+  forceFlush: async () => {},
+  shutdown: async () => {},
+});
+
+export const LangfusePlugin: Plugin = async ({
+  client,
+  project,
+  directory,
+  worktree,
+}) => {
   const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
   const secretKey = process.env.LANGFUSE_SECRET_KEY;
   const baseUrl = process.env.LANGFUSE_BASEURL ?? "https://cloud.langfuse.com";
@@ -29,8 +48,14 @@ export const LangfusePlugin: Plugin = async ({ client }) => {
     environment,
   });
 
+  const metadataProcessor = createMetadataSpanProcessor({
+    project: project.id,
+    directory,
+    worktree,
+  });
+
   const sdk = new NodeSDK({
-    spanProcessors: [processor],
+    spanProcessors: [metadataProcessor, processor],
   });
 
   sdk.start();
