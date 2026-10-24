@@ -71,6 +71,9 @@ OpenCode (OTEL spans) → LangfuseSpanProcessor → Langfuse Dashboard
 | `LANGFUSE_PUBLIC_KEY` | Yes      | -                            | Langfuse public key    |
 | `LANGFUSE_SECRET_KEY` | Yes      | -                            | Langfuse secret key    |
 | `LANGFUSE_BASEURL`    | No       | `https://cloud.langfuse.com` | Self-hosted instance   |
+| `LANGFUSE_CAPTURE_CONTENT` | No | `true` | Set to `false` to redact prompt and response content before export |
+
+Set `LANGFUSE_CAPTURE_CONTENT=false` to keep trace structure and non-content attributes while replacing recognized input/output content with `[REDACTED]` before it is sent to Langfuse. Content capture is enabled by default; only the exact value `false` (case-insensitive) disables it.
 
 ---
 

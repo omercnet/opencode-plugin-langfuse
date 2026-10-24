@@ -3,6 +3,7 @@ import { LangfusePlugin } from "./index";
 
 const mockForceFlush = mock(() => Promise.resolve());
 const mockStart = mock(() => {});
+let sdkOptions: any;
 
 mock.module("@langfuse/otel", () => ({
   LangfuseSpanProcessor: mock(() => ({
@@ -11,9 +12,10 @@ mock.module("@langfuse/otel", () => ({
 }));
 
 mock.module("@opentelemetry/sdk-node", () => ({
-  NodeSDK: mock(() => ({
-    start: mockStart,
-  })),
+  NodeSDK: mock((options: any) => {
+    sdkOptions = options;
+    return { start: mockStart };
+  }),
 }));
 
 const mockLog = mock(() => {});
@@ -41,6 +43,7 @@ describe("LangfusePlugin", () => {
     mockForceFlush.mockClear();
     mockStart.mockClear();
     mockLog.mockClear();
+    sdkOptions = undefined;
   });
 
   afterEach(() => {
@@ -50,6 +53,8 @@ describe("LangfusePlugin", () => {
   const setupEnv = (overrides: Record<string, string> = {}) => {
     process.env.LANGFUSE_PUBLIC_KEY = "pk-test";
     process.env.LANGFUSE_SECRET_KEY = "sk-test";
+    delete process.env.LANGFUSE_BASEURL;
+    delete process.env.LANGFUSE_CAPTURE_CONTENT;
     Object.assign(process.env, overrides);
   };
 
@@ -82,9 +87,53 @@ describe("LangfusePlugin", () => {
         body: {
           service: "langfuse-otel",
           level: "info",
-          message: "OTEL tracing initialized → https://cloud.langfuse.com",
+          message:
+            "OTEL tracing initialized → https://cloud.langfuse.com (content capture enabled)",
         },
       });
+    });
+
+    it("redacts content attributes when captureContent is disabled", async () => {
+      setupEnv({ LANGFUSE_CAPTURE_CONTENT: "false" });
+      await LangfusePlugin(mockPluginInput());
+
+      expect(sdkOptions.spanProcessors).toHaveLength(2);
+      const span = {
+        attributes: {
+          "langfuse.observation.input": "private prompt",
+          "langfuse.observation.output": "private response",
+          "gen_ai.input.messages": '[{"content":"private prompt"}]',
+          "gen_ai.output.messages": '[{"content":"private response"}]',
+          "gen_ai.system_instructions": "private system prompt",
+          "input.value": "private input",
+          "output.value": "private output",
+          "ai.toolCall.args": '{"query":"private tool input"}',
+          "ai.toolCall.result": '{"data":"private tool output"}',
+          "gen_ai.request.model": "model-name",
+          "opencode.client": "opencode",
+        },
+      };
+
+      sdkOptions.spanProcessors[0].onEnd(span);
+
+      expect(span.attributes["langfuse.observation.input"]).toBe("[REDACTED]");
+      expect(span.attributes["langfuse.observation.output"]).toBe("[REDACTED]");
+      expect(span.attributes["gen_ai.input.messages"]).toBe("[REDACTED]");
+      expect(span.attributes["gen_ai.output.messages"]).toBe("[REDACTED]");
+      expect(span.attributes["gen_ai.system_instructions"]).toBe("[REDACTED]");
+      expect(span.attributes["input.value"]).toBe("[REDACTED]");
+      expect(span.attributes["output.value"]).toBe("[REDACTED]");
+      expect(span.attributes["ai.toolCall.args"]).toBe("[REDACTED]");
+      expect(span.attributes["ai.toolCall.result"]).toBe("[REDACTED]");
+      expect(span.attributes["gen_ai.request.model"]).toBe("model-name");
+      expect(span.attributes["opencode.client"]).toBe("opencode");
+    });
+
+    it("keeps content capture enabled unless explicitly disabled", async () => {
+      setupEnv({ LANGFUSE_CAPTURE_CONTENT: "0" });
+      await LangfusePlugin(mockPluginInput());
+
+      expect(sdkOptions.spanProcessors).toHaveLength(1);
     });
   });
 
@@ -178,7 +227,8 @@ describe("LangfusePlugin", () => {
         body: {
           service: "langfuse-otel",
           level: "info",
-          message: "OTEL tracing initialized → https://cloud.langfuse.com",
+          message:
+            "OTEL tracing initialized → https://cloud.langfuse.com (content capture enabled)",
         },
       });
     });
@@ -192,7 +242,8 @@ describe("LangfusePlugin", () => {
         body: {
           service: "langfuse-otel",
           level: "info",
-          message: "OTEL tracing initialized → https://custom.langfuse.com",
+          message:
+            "OTEL tracing initialized → https://custom.langfuse.com (content capture enabled)",
         },
       });
     });
